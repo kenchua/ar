@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR.js Location-based Example</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/1.7.2/aframe/build/aframe-ar.min.js"></script>
+    <script src="https://rawgit.com/jeromeetienne/AR.js/1.7.2/aframe/build/aframe-ar-nft.min.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; 
+        gpsMinDistance: 5"
+        vr-mode-ui="enabled: false">
+
+        <!-- Display the user's GPS coordinates -->
+        <a-text id="gps-info" position="0 2 -5" value="Getting GPS..." color="yellow"></a-text>
+
+        <!-- AR Marker (Example: 37.7749, -122.4194 is San Francisco) -->
+        <a-entity 
+            gps-entity-place="latitude: 37.7749; longitude: -122.4194;" 
+            scale="10 10 10">
+            <a-box material="color: red;"></a-box>
+        </a-entity>
+
+        <a-camera gps-camera rotation-reader></a-camera>
+    </a-scene>
+
+    <script>
+        // Update GPS Info on Screen
+        navigator.geolocation.watchPosition((position) => {
+            let lat = position.coords.latitude.toFixed(6);
+            let lon = position.coords.longitude.toFixed(6);
+            document.getElementById('gps-info').setAttribute('value', `Lat: ${lat}, Lon: ${lon}`);
+        }, 
+        (err) => console.warn(`ERROR(${err.code}): ${err.message}`), 
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+    </script>
+</body>
+</html>
