@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR.js Location-Based with Camera Direction</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/1.7.2/aframe/build/aframe-ar.min.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; gpsMinDistance: 5"
+        vr-mode-ui="enabled: false">
+        
+        <!-- Text to display the current location -->
+        <a-text id="gps-info" position="0 2 -5" value="Getting GPS..." color="yellow"></a-text>
+
+        <!-- Placeholder for the projected location -->
+        <a-text id="target-location" position="0 1 -5" value="Target: ..." color="cyan"></a-text>
+
+        <!-- Example AR marker in front -->
+        <a-entity id="marker" 
+                  gps-entity-place="latitude: 0; longitude: 0" 
+                  scale="10 10 10">
+            <a-box material="color: red;"></a-box>
+        </a-entity>
+
+        <a-camera gps-camera rotation-reader></a-camera>
+    </a-scene>
+
+    <script>
+        let currentLat = 0;
+        let currentLon = 0;
+        let currentHeading = 0;  // Device orientation
+
+        // Watch for GPS updates
+        navigator.geolocation.watchPosition((position) => {
+            currentLat = position.coords.latitude;
+            currentLon = position.coords.longitude;
+
+            document.getElementById('gps-info').setAttribute('value', 
+                `Your Location: Lat ${currentLat.toFixed(6)}, Lon ${currentLon.toFixed(6)}`);
+
+            updateProjectedLocation();
+        }, 
+        (err) => console.warn(`ERROR(${err.code}): ${err.message}`), 
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+
+        // Listen for device orientation
+        window.addEventListener('deviceorientation', (event) => {
+            if (event.alpha !== null) {
+                currentHeading = event.alpha; // 0°-360° (Compass Direction)
+                updateProjectedLocation();
+            }
+        });
+
+        function updateProjectedLocation() {
+            if (currentLat === 0 && currentLon === 0) return;
+
+            // Estimate a target point 50 meters in front of the camera
+            let distance = 50 / 111000;  // 50m in degrees (~111km per degree)
+
+            let targetLat = currentLat + (distance * Math.cos(currentHeading * Math.PI / 180));
+            let targetLon = currentLon + (distance * Math.sin(currentHeading * Math.PI / 180));
+
+            document.getElementById('target-location').setAttribute('value', 
+                `Target: Lat ${targetLat.toFixed(6)}, Lon ${targetLon.toFixed(6)}`);
+
+            // Update AR marker position
+            let marker = document.getElementById('marker');
+            marker.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLon}`);
+        }
+    </script>
+</body>
+</html>
