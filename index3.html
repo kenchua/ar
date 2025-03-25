@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Location with Compass</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        #video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        #info { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); 
+                background: rgba(0, 0, 0, 0.5); color: white; padding: 10px; border-radius: 5px; }
+        canvas { position: absolute; top: 0; left: 0; }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay playsinline></video>
+    <div id="info">Initializing AR...</div>
+    <canvas id="arCanvas"></canvas>
+
+    <script>
+        const video = document.getElementById("video");
+        const info = document.getElementById("info");
+        const mapboxToken = "YOUR_MAPBOX_ACCESS_TOKEN"; // Replace with your Mapbox token
+        let userLat, userLon, userHeading = 0;
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+            } catch (error) {
+                console.error("Camera Error: ", error);
+                info.textContent = "Camera access denied.";
+            }
+        }
+
+        function getLocation() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition((position) => {
+                    userLat = position.coords.latitude;
+                    userLon = position.coords.longitude;
+                    info.textContent = `Lat: ${userLat.toFixed(6)}, Lon: ${userLon.toFixed(6)}, Heading: ${userHeading.toFixed(1)}°`;
+                });
+            } else {
+                info.textContent = "Geolocation not supported.";
+            }
+        }
+
+        function getCompassHeading() {
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener("deviceorientation", (event) => {
+                    if (event.alpha !== null) {
+                        userHeading = event.alpha; // 0° - 360° (North = 0°)
+                    }
+                }, true);
+            } else {
+                info.textContent = "Compass not supported.";
+            }
+        }
+
+        function calculateTargetLocation() {
+            const earthRadius = 6371e3; // Earth radius in meters
+            const distance = 10; // 10 meters ahead
+            const headingRad = userHeading * (Math.PI / 180);
+
+            const lat1 = userLat * (Math.PI / 180);
+            const lon1 = userLon * (Math.PI / 180);
+
+            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(distance / earthRadius) +
+                Math.cos(lat1) * Math.sin(distance / earthRadius) * Math.cos(headingRad));
+
+            const lon2 = lon1 + Math.atan2(Math.sin(headingRad) * Math.sin(distance / earthRadius) * Math.cos(lat1),
+                Math.cos(distance / earthRadius) - Math.sin(lat1) * Math.sin(lat2));
+
+            return {
+                latitude: lat2 * (180 / Math.PI),
+                longitude: lon2 * (180 / Math.PI)
+            };
+        }
+
+        function setupThreeJS() {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("arCanvas"), alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const marker = new THREE.Mesh(geometry, material);
+            scene.add(marker);
+
+            camera.position.z = 5;
+
+            function animate() {
+                requestAnimationFrame(animate);
+
+                if (userLat !== undefined && userLon !== undefined) {
+                    const target = calculateTargetLocation();
+                    marker.position.x = (target.latitude - userLat) * 10000; 
+                    marker.position.y = (target.longitude - userLon) * 10000; 
+                }
+
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        startCamera();
+        getLocation();
+        getCompassHeading();
+        setupThreeJS();
+    </script>
+</body>
+</html>
